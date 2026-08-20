@@ -1,33 +1,77 @@
 # ReachInbox Email Scheduler
 
-Full-stack email scheduling system built with Express, Prisma/PostgreSQL, Redis, BullMQ, Ethereal SMTP, and React.
+Production-oriented full-stack email scheduler built for the ReachInbox assignment.
 
-## Services
+Tech stack:
 
-- Backend API: Express + Prisma + BullMQ producer
-- Worker: BullMQ consumer with Redis-backed send throttling
-- Frontend: React + TypeScript + Tailwind dashboard with cookie-backed Google login
+- Backend: TypeScript, Express, Prisma, PostgreSQL, Redis, BullMQ, Nodemailer, Google OAuth
+- Frontend: React, TypeScript, Tailwind CSS, React Router, Axios
+- Infra: Docker Compose for PostgreSQL and Redis
 
-## Local setup
+## Repository
 
-1. Copy `.env.example` to `.env`.
-2. Start PostgreSQL and Redis with `docker compose up -d`.
-3. Install dependencies with `npm install`.
-4. Generate Prisma client with `npm run prisma:generate`.
-5. Run Prisma migrations with `npm run prisma:migrate --workspace backend`.
-6. Start backend with `npm run dev:backend`.
-7. Start worker with `npm run worker`.
-8. Start frontend with `npm run dev:frontend`.
+- Monorepo with `backend/` and `frontend/`
+- Remote: [kritii10/ReachInbox](https://github.com/kritii10/ReachInbox)
+
+Submission note:
+
+1. Make the GitHub repository private.
+2. Invite GitHub user `Mitrajit` with access before submitting.
+
+## Project structure
+
+```text
+.
+├── backend
+├── frontend
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
+
+## Environment setup
+
+1. Copy the root env template:
+
+```bash
+cp .env.example .env
+```
+
+2. Copy the frontend env template:
+
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+3. Fill the required values in `.env`.
+
+## Ethereal Email setup
+
+The worker sends mail through Ethereal SMTP for development/demo purposes.
+
+1. Create an Ethereal account or test SMTP credentials.
+2. Put the SMTP values into the root `.env`.
+3. Restart the backend worker after changing SMTP variables.
+
+Required SMTP env variables:
+
+```bash
+SMTP_HOST=smtp.ethereal.email
+SMTP_PORT=587
+SMTP_USER=your-ethereal-username
+SMTP_PASS=your-ethereal-password
+```
+
+When an email is sent successfully, the worker logs the Ethereal preview URL so it can be shown in the demo.
 
 ## Google OAuth setup
 
-1. Create a Google OAuth 2.0 Web application in Google Cloud.
+1. Create a Google OAuth 2.0 Web Application in Google Cloud.
 2. Add `http://localhost:4000/api/auth/google/callback` as an authorized redirect URI.
-3. Copy the Google client ID and client secret into `.env`.
+3. Add the credentials to `.env`.
 4. Keep `FRONTEND_URL=http://localhost:5173` for local development unless you intentionally change the frontend origin.
-5. Restart the backend after updating auth environment variables.
 
-Required auth environment variables:
+Required auth env variables:
 
 ```bash
 GOOGLE_CLIENT_ID=your-google-client-id
@@ -41,49 +85,153 @@ COOKIE_SAME_SITE=lax
 COOKIE_SECURE=false
 ```
 
-## Notes
+## Run backend
 
-- Docker Compose is included for PostgreSQL and Redis.
-- Scheduled jobs use BullMQ delayed jobs only.
-- Email state is stored in PostgreSQL and verified before every send.
-- Google authentication uses the OAuth 2.0 authorization code flow.
-- Authenticated sessions are stored in PostgreSQL and identified with HTTP-only cookies.
-- `GET /api/auth/google` starts login, `GET /api/auth/google/callback` completes it, `GET /api/auth/me` restores the current session, and `POST /api/auth/logout` invalidates the session.
-- `WORKER_CONCURRENCY` controls how many BullMQ jobs a worker can process in parallel.
-- `MIN_EMAIL_DELAY_MS` is a global minimum spacing between SMTP send start times across all worker instances.
-- `MAX_EMAILS_PER_HOUR` is a sender-scoped hourly limit enforced in Redis with atomic operations.
-- The compose flow supports optional sender overrides, so a scheduled batch can use a different sender email/name while still using the configured SMTP transport.
-- Hourly counters are keyed by sender and UTC hour window, following the shape `email-rate:{senderId}:{YYYY-MM-DD-HH}`.
-- When an hourly limit is exhausted, the worker does not fail or drop the email. It returns the row to `SCHEDULED`, moves the active BullMQ job back to delayed, and retries at the next UTC hour boundary.
-- Send throttling is coordinated in Redis, so multiple workers do not rely on local in-memory timestamps.
-- Concurrency and throttling interact intentionally: several jobs may be fetched and wait for reserved send slots, but Redis ensures their actual send starts are spaced.
-- Concurrency and hourly rate limiting also interact intentionally: multiple workers can compete for the final slot in an hour, but the Redis Lua reservation guarantees only one worker gets it.
-- Worker restart behavior relies on persisted PostgreSQL rows plus BullMQ delayed jobs in Redis. Normal restarts do not recreate scheduled jobs from the database.
-- On worker startup, a narrow reconciliation pass inspects only `SCHEDULED` and `PROCESSING` emails. It repairs inconsistent rows idempotently, such as a `PROCESSING` email whose BullMQ job is no longer active, or a `SCHEDULED` email whose queue job is missing.
-- If BullMQ marks a job as stalled after a crash, the worker returns the matching email row from `PROCESSING` to `SCHEDULED` so the re-queued BullMQ job can safely claim it again.
-- If a queue/job mismatch delivers a future email too early, the worker moves that BullMQ job back to delayed using the database `scheduledAt` timestamp instead of sending early.
-- Completed `SENT` emails are excluded from startup reconciliation, so restarting the worker does not recreate or resend already-finished emails.
-- Trade-off: reserving slots before send avoids back-to-back sends across instances, but if a worker crashes after reserving a slot, that short time window is effectively lost.
-- Trade-off: when an email is rate-limited after being claimed, the worker briefly transitions it to `PROCESSING`, then returns it to `SCHEDULED` before moving the BullMQ job back to delayed. That avoids duplicate sends, but it means ordering is best-effort rather than a strict FIFO guarantee across hour boundaries.
+Open three terminals from the repository root.
 
-## Restart verification
+Terminal 1:
 
-The restart path was verified against live PostgreSQL and Redis state with this flow:
+```bash
+docker compose up -d
+npm install
+npm run prisma:generate
+npm run prisma:migrate --workspace backend
+npm run dev:backend
+```
 
-1. Schedule multiple emails for future timestamps.
-2. Confirm PostgreSQL rows exist in `SCHEDULED` with stable `bullJobId` values.
-3. Confirm BullMQ contains matching delayed job IDs in Redis.
-4. Stop both the API process and the worker process before the emails are due.
-5. Wait while only PostgreSQL and Redis remain alive.
-6. Confirm the same rows and delayed jobs still exist without any backend process replaying them.
-7. Restart the API and worker.
-8. Confirm worker startup reconciliation reports `requeued=0` for healthy delayed jobs.
-9. Observe the worker send the emails at their intended scheduled times.
-10. Confirm PostgreSQL transitions to `SENT`, BullMQ delayed jobs are consumed, and a subsequent worker restart reports `inspected=0` rather than recreating completed work.
+Terminal 2:
 
-## Rate-limit verification
+```bash
+npm run worker
+```
 
-Use the load test to verify hourly rate limiting and future-hour rescheduling without sending real Ethereal emails:
+Backend services:
+
+- Express API: `http://localhost:4000`
+- Health check: `GET http://localhost:4000/health`
+
+## Run frontend
+
+Terminal 3:
+
+```bash
+npm run dev:frontend
+```
+
+Frontend app:
+
+- React dashboard: `http://localhost:5173`
+
+Frontend env:
+
+```bash
+VITE_API_BASE_URL=http://localhost:4000/api
+```
+
+## Architecture overview
+
+High-level flow:
+
+`Controller -> Service -> Queue -> Worker -> SMTP`
+
+Main pieces:
+
+- Express controllers stay thin and validate/forward requests.
+- Business logic lives in backend services.
+- PostgreSQL is the source of truth for users, senders, sessions, and email state.
+- BullMQ delayed jobs in Redis are used for scheduling.
+- A separate BullMQ worker processes queued emails.
+- Nodemailer with Ethereal SMTP handles delivery.
+
+## How scheduling works
+
+1. The authenticated user submits a batch through `POST /api/emails/schedule`.
+2. The backend validates subject, body, recipients, start time, delay, and optional hourly limit.
+3. A database `Email` row is created per recipient with a unique idempotency key.
+4. The scheduler service calculates each row's initial `scheduledAt`.
+5. A BullMQ delayed job is created for each email using the database email ID as the stable job identity.
+6. The BullMQ job ID is stored back in PostgreSQL.
+7. The HTTP request returns without sending directly.
+
+## How persistence on restart is handled
+
+Persistence is based on PostgreSQL plus Redis/BullMQ, not on in-memory state.
+
+1. Email rows remain persisted in PostgreSQL.
+2. Delayed BullMQ jobs remain persisted in Redis.
+3. Restarting the API or worker does not recreate all jobs on startup.
+4. The worker verifies database state before sending, so already `SENT` emails are not sent again.
+5. A narrow reconciliation pass repairs only inconsistent `SCHEDULED` or `PROCESSING` rows when queue state and database state disagree.
+
+## How rate limiting and concurrency are implemented
+
+Concurrency:
+
+- `WORKER_CONCURRENCY` controls how many BullMQ jobs one worker processes in parallel.
+
+Minimum send delay:
+
+- `MIN_EMAIL_DELAY_MS` enforces a global minimum spacing between SMTP send start times.
+- Coordination is Redis-backed, so multiple workers/instances do not rely on local timestamps.
+
+Hourly rate limit:
+
+- `MAX_EMAILS_PER_HOUR` is configurable through env.
+- Rate limiting is sender-scoped and hour-scoped with Redis atomic operations.
+- Redis keys use the pattern `email-rate:{senderId}:{YYYY-MM-DD-HH}`.
+- If a sender's hour is full, the worker does not fail the email. It returns the row to `SCHEDULED` and reschedules the BullMQ job for the next available hour.
+
+## Features implemented
+
+Backend:
+
+- Prisma schema for `User`, `Sender`, `Email`, and authenticated sessions
+- PostgreSQL persistence for email state
+- BullMQ delayed scheduling
+- Separate worker process with graceful shutdown
+- Idempotent email processing and atomic `SCHEDULED -> PROCESSING` claiming
+- Ethereal SMTP sending via Nodemailer
+- Configurable worker concurrency
+- Redis-backed minimum send delay coordination
+- Redis-backed hourly rate limiting with atomic reservation
+- Rescheduling after rate-limit exhaustion
+- Restart resilience using persisted DB rows and BullMQ jobs
+- Google OAuth login and cookie-backed authenticated sessions
+- API pagination, validation, and health checks
+- Load-test script for 1000+ scheduled emails without sending 1000 real Ethereal messages
+- Automated tests for scheduling, claiming, idempotency, rate limiting, rescheduling, API validation, and auth middleware
+
+Frontend:
+
+- React + TypeScript + Tailwind app foundation
+- Real Google login flow
+- Protected routes
+- Responsive dashboard
+- Header with branding, avatar, name, email, and logout
+- Compose New Email modal
+- CSV/text recipient parsing
+- Email detection, deduplication, and validation
+- Configurable start time, delay, and hourly limit
+- Scheduled Emails table
+- Sent Emails table
+- Loading, empty, and error states
+- Reusable UI components and API services
+
+## Restart demonstration
+
+Use this flow in the demo video:
+
+1. Schedule several emails a short time into the future.
+2. Show the scheduled rows in the dashboard.
+3. Stop the API and worker before those emails are due.
+4. Wait briefly while PostgreSQL and Redis stay running.
+5. Start the API and worker again.
+6. Show that the delayed jobs are still processed at the intended time.
+7. Show that already `SENT` emails are not recreated or resent.
+
+## Rate-limit demonstration
+
+Use the load test to demonstrate rate limiting and future-hour rescheduling without sending 1000 real Ethereal emails:
 
 ```bash
 LOAD_TEST_EMAILS=1000 \
@@ -93,34 +241,52 @@ MIN_EMAIL_DELAY_MS=25 \
 npm run load:test
 ```
 
-Expected result:
+What to point out:
 
-1. `jobs_created` matches `LOAD_TEST_EMAILS`.
-2. `sent` stops at the current hour limit.
-3. `jobs_rescheduled` and `rescheduled_rows_in_future_windows` cover the remainder.
-4. `duplicate_attempts_prevented` is greater than `0` because the script retries queue insertion with the same BullMQ job IDs.
-5. `unique_email_records` and `unique_bull_job_ids` stay equal to the total scheduled count.
+1. `jobs_created` matches the scheduled total.
+2. `sent` stops at the current hourly limit.
+3. Remaining jobs are rescheduled into future hour windows.
+4. Duplicate queue insert attempts do not create duplicate jobs.
+5. Duplicate email sends are prevented by the worker's database claim logic.
 
-## Final demo
+## Demo video outline
 
-1. Copy `.env.example` to `.env` and fill in real Google OAuth and Ethereal credentials.
-2. Start infrastructure with `docker compose up -d`.
-3. Install dependencies with `npm install`.
-4. Generate Prisma client with `npm run prisma:generate`.
-5. Run migrations with `npm run prisma:migrate --workspace backend`.
-6. Start the API with `npm run dev:backend`.
-7. Start the worker with `npm run worker`.
-8. Start the frontend with `npm run dev:frontend`.
-9. Sign in with Google from the login page.
-10. Open Compose New Email and optionally provide a sender email/name override.
-11. Upload a CSV or paste recipients, set start time, delay, and hourly limit, then schedule the batch.
-12. Confirm scheduled rows in the dashboard, sent rows after completion, and Ethereal preview URLs in the worker logs.
-13. Run `npm run load:test` to demonstrate 1000+ scheduling behavior and Redis-backed rate-limit rescheduling without sending 1000 real emails.
+Keep the video under 5 minutes:
 
-## Frontend environment
+1. Show `docker compose up -d`.
+2. Show backend, worker, and frontend running in separate terminals.
+3. Log in with Google.
+4. Open the dashboard and show Scheduled and Sent tabs.
+5. Open Compose New Email.
+6. Upload a CSV or paste recipients.
+7. Show detected recipient count, start time, delay, and hourly limit.
+8. Schedule the batch.
+9. Show PostgreSQL/BullMQ-backed scheduled rows appearing in the dashboard.
+10. Show worker logs, including send logs and Ethereal preview URLs.
+11. Do the restart scenario.
+12. Optionally show `npm run load:test` as the rate-limit/load bonus.
 
-Create `frontend/.env` with:
+## Assumptions, shortcuts, and trade-offs
+
+- Multiple senders are supported as sender identity values per batch/email; the SMTP transport still uses the configured Ethereal account for actual delivery in this assignment setup.
+- Ordering is best-effort when hourly rate limiting pushes emails into future hour windows.
+- The system reserves throttling/rate-limit slots before send to avoid cross-worker duplication and back-to-back sends.
+- If a worker crashes after reserving a slot but before sending, that reserved slot is effectively lost for that time window.
+- Local development uses non-secure cookies with `COOKIE_SECURE=false`; production should set secure cookie settings and a trusted HTTPS origin.
+
+## Useful commands
 
 ```bash
-VITE_API_BASE_URL=http://localhost:4000/api
+npm run build --workspace backend
+npm run build --workspace frontend
+npm run test --workspace backend
+cd backend && npx prisma validate
 ```
+
+## Included files for submission
+
+- `README.md`
+- `.env.example`
+- `frontend/.env.example`
+- `docker-compose.yml`
+
