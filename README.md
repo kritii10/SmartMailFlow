@@ -8,16 +8,6 @@ Tech stack:
 - Frontend: React, TypeScript, Tailwind CSS, React Router, Axios
 - Infra: Docker Compose for PostgreSQL and Redis
 
-## Repository
-
-- Monorepo with `backend/` and `frontend/`
-- Remote: [kritii10/ReachInbox](https://github.com/kritii10/ReachInbox)
-
-Submission note:
-
-1. Make the GitHub repository private.
-2. Invite GitHub user `Mitrajit` with access before submitting.
-
 ## Project structure
 
 ```text
@@ -217,18 +207,6 @@ Frontend:
 - Loading, empty, and error states
 - Reusable UI components and API services
 
-## Restart demonstration
-
-Use this flow in the demo video:
-
-1. Schedule several emails a short time into the future.
-2. Show the scheduled rows in the dashboard.
-3. Stop the API and worker before those emails are due.
-4. Wait briefly while PostgreSQL and Redis stay running.
-5. Start the API and worker again.
-6. Show that the delayed jobs are still processed at the intended time.
-7. Show that already `SENT` emails are not recreated or resent.
-
 ## Rate-limit demonstration
 
 Use the load test to demonstrate rate limiting and future-hour rescheduling without sending 1000 real Ethereal emails:
@@ -248,23 +226,6 @@ What to point out:
 3. Remaining jobs are rescheduled into future hour windows.
 4. Duplicate queue insert attempts do not create duplicate jobs.
 5. Duplicate email sends are prevented by the worker's database claim logic.
-
-## Demo video outline
-
-Keep the video under 5 minutes:
-
-1. Show `docker compose up -d`.
-2. Show backend, worker, and frontend running in separate terminals.
-3. Log in with Google.
-4. Open the dashboard and show Scheduled and Sent tabs.
-5. Open Compose New Email.
-6. Upload a CSV or paste recipients.
-7. Show detected recipient count, start time, delay, and hourly limit.
-8. Schedule the batch.
-9. Show PostgreSQL/BullMQ-backed scheduled rows appearing in the dashboard.
-10. Show worker logs, including send logs and Ethereal preview URLs.
-11. Do the restart scenario.
-12. Optionally show `npm run load:test` as the rate-limit/load bonus.
 
 ## Assumptions, shortcuts, and trade-offs
 
