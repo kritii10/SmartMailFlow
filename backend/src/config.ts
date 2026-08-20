@@ -1,5 +1,8 @@
-import "dotenv/config";
+import { config as loadEnvFile } from "dotenv";
 import { z } from "zod";
+
+loadEnvFile({ path: "../.env" });
+loadEnvFile();
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -7,6 +10,8 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
+  REDIS_HOST: z.string().min(1).optional(),
+  REDIS_PORT: z.coerce.number().int().positive().optional(),
   EMAIL_QUEUE_NAME: z.string().default("email-scheduler"),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
   MIN_EMAIL_DELAY_MS: z.coerce.number().int().nonnegative().default(2000),
@@ -26,8 +31,22 @@ const envSchema = z.object({
   COOKIE_SECURE: z.enum(["true", "false"]).optional()
 });
 
+const resolveRedisUrl = () => {
+  if (process.env.REDIS_URL) {
+    return process.env.REDIS_URL;
+  }
+
+  if (process.env.REDIS_HOST) {
+    const port = process.env.REDIS_PORT ?? "6379";
+    return `redis://${process.env.REDIS_HOST}:${port}`;
+  }
+
+  return undefined;
+};
+
 const rawEnv = {
   ...process.env,
+  REDIS_URL: resolveRedisUrl(),
   GOOGLE_CLIENT_SECRET:
     process.env.GOOGLE_CLIENT_SECRET ??
     (process.env.NODE_ENV === "test" ? "test-google-client-secret" : undefined),

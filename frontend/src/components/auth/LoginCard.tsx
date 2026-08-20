@@ -6,52 +6,39 @@ export const LoginCard = () => {
   const { clearError, error, login } = useAuth();
 
   return (
-    <section className="surface-dark overflow-hidden px-6 py-8 md:px-10 md:py-10">
-      <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-        <div>
-          <p className="text-sm uppercase tracking-[0.32em] text-gold">ReachInbox Assignment</p>
-          <h1 className="mt-4 max-w-2xl font-serif text-4xl text-sand md:text-5xl">
-            Sign in to the scheduling workspace built for reliable delayed email delivery.
-          </h1>
-          <p className="mt-4 max-w-2xl text-base text-sand/72">
-            Google OAuth unlocks the dashboard, while BullMQ, PostgreSQL, Redis, and Ethereal power the production-oriented delivery pipeline behind it.
-          </p>
+    <section className="rounded-[30px] border border-white/12 bg-white/8 p-6 shadow-panel backdrop-blur md:p-8">
+      <div className="rounded-[24px] border border-white/10 bg-white px-6 py-7 text-ink md:px-7 md:py-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+          Secure Access
+        </p>
+        <h2 className="mt-3 font-serif text-3xl text-slate-900">Sign in to continue</h2>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Access your dashboard, review scheduled campaigns, and manage outbound delivery from one
+          place.
+        </p>
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button onClick={login} size="lg">
-              Continue with Google
-            </Button>
-            <Button
-              className="border-white/15 bg-transparent text-sand hover:bg-white/10"
-              onClick={clearError}
-              size="lg"
-              variant="ghost"
-            >
-              Clear message
-            </Button>
-          </div>
-
-          {error ? (
-            <div className="mt-6">
-              <ErrorState message={error} />
-            </div>
-          ) : null}
+        <div className="mt-8">
+          <Button className="w-full justify-center" onClick={login} size="lg">
+            Continue with Google
+          </Button>
         </div>
 
-        <div className="rounded-[28px] bg-white/10 p-5">
-          <p className="text-xs uppercase tracking-[0.24em] text-gold">Foundation included</p>
-          <div className="mt-4 grid gap-4 text-sm text-sand/78">
-            <div className="rounded-[22px] bg-white/8 p-4">
-              Typed API services for auth and email resources
-            </div>
-            <div className="rounded-[22px] bg-white/8 p-4">
-              Protected routing with session restoration on page load
-            </div>
-            <div className="rounded-[22px] bg-white/8 p-4">
-              Shared UI primitives for tables, forms, states, and modal flows
-            </div>
+        {error ? (
+          <div className="mt-5">
+            <ErrorState
+              action={
+                <button
+                  className="text-sm font-medium text-rose-900 underline decoration-rose-300 underline-offset-4"
+                  onClick={clearError}
+                  type="button"
+                >
+                  Dismiss message
+                </button>
+              }
+              message={error}
+            />
           </div>
-        </div>
+        ) : null}
       </div>
     </section>
   );

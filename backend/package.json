@@ -4,14 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "prisma generate && tsc -p tsconfig.json",
     "dev": "tsx watch src/server.ts",
-    "worker": "tsx watch src/worker.ts",
+    "start": "node dist/server.js",
+    "worker": "node dist/worker.js",
+    "worker:dev": "tsx watch src/worker.ts",
     "load:test": "tsx src/scripts/load-test.ts",
     "lint": "tsc --noEmit",
     "test": "NODE_ENV=test EMAIL_QUEUE_NAME=email-scheduler-test SMTP_USER=test-scheduler@example.com node --import tsx --test --test-concurrency=1 src/services/email-worker.service.test.ts src/services/rate-limit.service.test.ts src/services/restart-recovery.service.test.ts src/services/scheduler.service.test.ts src/services/email.service.test.ts src/app.integration.test.ts",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0",

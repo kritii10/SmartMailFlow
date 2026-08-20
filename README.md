@@ -60,6 +60,7 @@ When an email is sent successfully, the worker logs the Ethereal preview URL so 
 2. Add `http://localhost:4000/api/auth/google/callback` as an authorized redirect URI.
 3. Add the credentials to `.env`.
 4. Keep `FRONTEND_URL=http://localhost:5173` for local development unless you intentionally change the frontend origin.
+5. For production, add your deployed backend callback URL in the form `https://<backend-service>.onrender.com/api/auth/google/callback`.
 
 Required auth env variables:
 
@@ -98,7 +99,7 @@ npm run worker
 Backend services:
 
 - Express API: `http://localhost:4000`
-- Health check: `GET http://localhost:4000/health`
+- Health check: `GET http://localhost:4000/api/health`
 
 ## Run frontend
 
@@ -115,7 +116,7 @@ Frontend app:
 Frontend env:
 
 ```bash
-VITE_API_BASE_URL=http://localhost:4000/api
+VITE_API_URL=http://localhost:4000
 ```
 
 ## Architecture overview
@@ -244,10 +245,127 @@ npm run test --workspace backend
 cd backend && npx prisma validate
 ```
 
+## Deployment
+
+Target deployment topology:
+
+- Frontend: Render Static Site
+- Backend API: Render Web Service
+- Worker: Render Background Worker
+- Database: Render PostgreSQL
+- Queue/cache: Render Key Value
+- Email transport: Ethereal SMTP
+- Authentication: Google OAuth
+
+### Production environment variables
+
+Backend API and worker:
+
+```bash
+NODE_ENV=production
+PORT=4000
+FRONTEND_URL=https://<frontend-site>.onrender.com
+DATABASE_URL=postgresql://...
+REDIS_URL=redis://...
+EMAIL_QUEUE_NAME=email-scheduler
+WORKER_CONCURRENCY=5
+MIN_EMAIL_DELAY_MS=2000
+MAX_EMAILS_PER_HOUR=100
+SMTP_HOST=smtp.ethereal.email
+SMTP_PORT=587
+SMTP_USER=your-ethereal-username
+SMTP_PASS=your-ethereal-password
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=https://<backend-service>.onrender.com/api/auth/google/callback
+AUTH_COOKIE_NAME=reachinbox_session
+OAUTH_STATE_COOKIE_NAME=reachinbox_oauth_state
+OAUTH_STATE_TTL_MS=600000
+SESSION_TTL_MS=604800000
+COOKIE_SAME_SITE=none
+COOKIE_SECURE=true
+```
+
+Frontend:
+
+```bash
+VITE_API_URL=https://<backend-service>.onrender.com
+```
+
+### Render Static Site
+
+Frontend service configuration:
+
+- Root Directory: `frontend`
+- Build Command: `npm install && npm run build`
+- Publish Directory: `dist`
+- Environment variable: `VITE_API_URL=https://<backend-service>.onrender.com`
+- Rewrite rule: `/* -> /index.html` with `Rewrite`
+
+### Render Web Service
+
+Backend API service configuration:
+
+- Root Directory: `backend`
+- Build Command: `npm install && npm run build && npm run prisma:migrate:deploy`
+- Start Command: `npm run start`
+- Health Check Path: `/api/health`
+
+Notes:
+
+- The API binds to `0.0.0.0` and respects `process.env.PORT`.
+- CORS allows the configured `FRONTEND_URL` only and keeps credentials enabled.
+- Google OAuth callback URL must match `GOOGLE_REDIRECT_URI`.
+- Cookie settings for cross-origin frontend/backend deployment should use `COOKIE_SAME_SITE=none` and `COOKIE_SECURE=true`.
+
+### Render Background Worker
+
+Worker service configuration:
+
+- Root Directory: `backend`
+- Build Command: `npm install && npm run build`
+- Start Command: `npm run worker`
+
+Worker required environment variables:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `EMAIL_QUEUE_NAME`
+- `WORKER_CONCURRENCY`
+- `MIN_EMAIL_DELAY_MS`
+- `MAX_EMAILS_PER_HOUR`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+
+The worker remains fully independent from Express and is not started by the API process.
+
+### Prisma deployment flow
+
+Production Prisma commands:
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+```
+
+`prisma migrate reset` is not used in production.
+
+### Docker
+
+`docker-compose.yml` remains for local development only. Render deployment should use managed Render Postgres and Render Key Value instead of local Docker services.
+
+### Deployment risks
+
+- Cross-origin cookies require HTTPS plus the production cookie settings shown above.
+- The frontend must point to the deployed backend URL through `VITE_API_URL`; otherwise browser auth/session requests will fail.
+- The worker and API must share the same `DATABASE_URL`, `REDIS_URL`, queue name, and SMTP credentials.
+- Ethereal is suitable for demo/staging usage, not for real production email delivery.
+
 ## Included files for submission
 
 - `README.md`
 - `.env.example`
 - `frontend/.env.example`
 - `docker-compose.yml`
-

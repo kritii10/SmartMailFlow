@@ -9,11 +9,14 @@
     "build": "npm run build --workspaces",
     "dev": "npm run dev --workspace backend",
     "dev:backend": "npm run dev --workspace backend",
-    "worker": "npm run worker --workspace backend",
+    "worker": "npm run worker:dev --workspace backend",
+    "start:backend": "npm run start --workspace backend",
+    "start:worker": "npm run worker --workspace backend",
     "load:test": "npm run load:test --workspace backend",
     "dev:frontend": "npm run dev --workspace frontend",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspace backend",
-    "prisma:generate": "npm run prisma:generate --workspace backend"
+    "prisma:generate": "npm run prisma:generate --workspace backend",
+    "prisma:migrate:deploy": "npm run prisma:migrate:deploy --workspace backend"
   }
 }

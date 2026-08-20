@@ -21,7 +21,7 @@ export const AppHeader = () => {
           </div>
           <div>
             <p className="text-lg font-semibold text-slate-900">ReachInbox</p>
-            <p className="text-sm text-slate-500">Email scheduling workspace</p>
+            <p className="text-sm text-slate-500">Outbound operations</p>
           </div>
         </div>
 

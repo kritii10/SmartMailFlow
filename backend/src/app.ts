@@ -1,6 +1,8 @@
 import cors from "cors";
 import express from "express";
 import { env } from "./config.js";
+import { prisma } from "./prisma.js";
+import { redisConnection } from "./redis.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { emailRouter } from "./routes/email.routes.js";
 
@@ -43,8 +45,19 @@ app.use(
 );
 app.use(express.json({ limit: "2mb" }));
 
-app.get("/health", (_request, response) => {
-  response.json({ ok: true });
+app.get(["/health", "/api/health"], async (_request, response) => {
+  const [databaseCheck, redisCheck] = await Promise.allSettled([
+    prisma.$queryRaw`SELECT 1`,
+    redisConnection.ping()
+  ]);
+
+  response.json({
+    status: "ok",
+    services: {
+      database: databaseCheck.status === "fulfilled" ? "ok" : "unavailable",
+      redis: redisCheck.status === "fulfilled" ? "ok" : "unavailable"
+    }
+  });
 });
 
 app.use("/api/auth", authRouter);

@@ -4,8 +4,8 @@ import { disconnectPrisma } from "./prisma.js";
 import { closeQueueResources } from "./queue.js";
 import { closeRedisConnections } from "./redis.js";
 
-const server = app.listen(env.PORT, () => {
-  console.log(`API listening on http://localhost:${env.PORT}`);
+const server = app.listen(env.PORT, "0.0.0.0", () => {
+  console.log(`API listening on 0.0.0.0:${env.PORT}`);
 });
 
 const shutdown = async (signal: string) => {
