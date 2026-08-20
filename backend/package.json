@@ -1,0 +1,40 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/server.ts",
+    "worker": "tsx watch src/worker.ts",
+    "load:test": "tsx src/scripts/load-test.ts",
+    "lint": "tsc --noEmit",
+    "test": "NODE_ENV=test EMAIL_QUEUE_NAME=email-scheduler-test SMTP_USER=test-scheduler@example.com node --import tsx --test --test-concurrency=1 src/services/email-worker.service.test.ts src/services/rate-limit.service.test.ts src/services/restart-recovery.service.test.ts src/services/scheduler.service.test.ts src/services/email.service.test.ts src/app.integration.test.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.14.0",
+    "axios": "^1.11.0",
+    "bullmq": "^5.58.0",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "google-auth-library": "^9.15.1",
+    "ioredis": "^5.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7.0.5",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.3.0",
+    "@types/nodemailer": "^7.0.1",
+    "prisma": "^6.14.0",
+    "tsx": "^4.20.4",
+    "typescript": "^5.9.2"
+  }
+}
