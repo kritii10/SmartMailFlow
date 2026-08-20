@@ -7,6 +7,8 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
+    "start:all": "node dist/start-all.js",
+    "start:production": "node dist/start-all.js",
     "worker": "node dist/worker.js",
     "worker:dev": "tsx watch src/worker.ts",
     "load:test": "tsx src/scripts/load-test.ts",

@@ -5,6 +5,7 @@ import { prisma } from "./prisma.js";
 import { redisConnection } from "./redis.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { emailRouter } from "./routes/email.routes.js";
+import { getWorkerRuntimeStatus } from "./worker-state.js";
 
 export const app = express();
 
@@ -53,6 +54,7 @@ app.get(["/health", "/api/health"], async (_request, response) => {
 
   response.json({
     status: "ok",
+    worker: getWorkerRuntimeStatus(),
     services: {
       database: databaseCheck.status === "fulfilled" ? "ok" : "unavailable",
       redis: redisCheck.status === "fulfilled" ? "ok" : "unavailable"

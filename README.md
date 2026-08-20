@@ -119,6 +119,9 @@ Frontend env:
 VITE_API_URL=http://localhost:4000
 ```
 
+`VITE_API_URL` should be the backend origin only. The frontend API client appends `/api` automatically.
+`VITE_API_BASE_URL` is still supported for backward compatibility, and the client normalizes either form.
+
 ## Architecture overview
 
 High-level flow:
@@ -251,7 +254,7 @@ Target deployment topology:
 
 - Frontend: Render Static Site
 - Backend API: Render Web Service
-- Worker: Render Background Worker
+- Worker: BullMQ worker running inside the same free Render Web Service for demo hosting
 - Database: Render PostgreSQL
 - Queue/cache: Render Key Value
 - Email transport: Ethereal SMTP
@@ -292,6 +295,16 @@ Frontend:
 VITE_API_URL=https://<backend-service>.onrender.com
 ```
 
+Preferred format:
+
+- Local: `VITE_API_URL=http://localhost:4000`
+- Render: `VITE_API_URL=https://reachinbox-api.onrender.com`
+
+Why:
+
+- The frontend client automatically appends `/api` when building request URLs.
+- Using `/api` directly in `VITE_API_URL` also works because the client normalizes it, but the preferred and least ambiguous value is the backend origin without `/api`.
+
 ### Render Static Site
 
 Frontend service configuration:
@@ -308,7 +321,7 @@ Backend API service configuration:
 
 - Root Directory: `backend`
 - Build Command: `npm install && npm run build && npm run prisma:migrate:deploy`
-- Start Command: `npm run start`
+- Start Command: `npm run start:production`
 - Health Check Path: `/api/health`
 
 Notes:
@@ -317,10 +330,22 @@ Notes:
 - CORS allows the configured `FRONTEND_URL` only and keeps credentials enabled.
 - Google OAuth callback URL must match `GOOGLE_REDIRECT_URI`.
 - Cookie settings for cross-origin frontend/backend deployment should use `COOKIE_SAME_SITE=none` and `COOKIE_SECURE=true`.
+- `npm run start:production` starts both Express and the BullMQ worker in the same Node.js process for zero-cost Render hosting.
 
-### Render Background Worker
+### Free Render Deployment
 
-Worker service configuration:
+- Render Free Web Service runs both API and BullMQ worker because a separate Render Background Worker is not being used on the free tier.
+- PostgreSQL and Redis remain external managed services.
+- BullMQ delayed jobs remain persisted in Redis.
+- PostgreSQL remains the source of truth.
+- No cron is used.
+- Local development still supports a separate worker with `npm run worker`.
+- Render Free Web Services may spin down after inactivity, so this setup is intended for assignment/demo hosting rather than guaranteed 24/7 worker uptime.
+- For true always-on production deployment, the worker should run as a separate paid Background Worker or equivalent always-on compute service.
+
+### Optional Separate Worker Deployment
+
+If you later want an always-on dedicated worker process, use:
 
 - Root Directory: `backend`
 - Build Command: `npm install && npm run build`
@@ -339,7 +364,7 @@ Worker required environment variables:
 - `SMTP_USER`
 - `SMTP_PASS`
 
-The worker remains fully independent from Express and is not started by the API process.
+The worker remains a real BullMQ worker and can still run fully independently from Express.
 
 ### Prisma deployment flow
 
@@ -362,6 +387,7 @@ npx prisma migrate deploy
 - The frontend must point to the deployed backend URL through `VITE_API_URL`; otherwise browser auth/session requests will fail.
 - The worker and API must share the same `DATABASE_URL`, `REDIS_URL`, queue name, and SMTP credentials.
 - Ethereal is suitable for demo/staging usage, not for real production email delivery.
+- Render Free Web Services can sleep when idle, so delayed jobs are not guaranteed to execute with always-on reliability in the zero-cost deployment mode.
 
 ## Included files for submission
 

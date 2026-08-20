@@ -2,11 +2,12 @@ import { startApiServer } from "./api-server.js";
 import { disconnectPrisma } from "./prisma.js";
 import { closeQueueResources } from "./queue.js";
 import { closeRedisConnections } from "./redis.js";
+import { startEmailWorker } from "./worker-runner.js";
 
 let shuttingDown = false;
 
 const start = async () => {
-  const apiServer = await startApiServer();
+  const [apiServer, workerHandle] = await Promise.all([startApiServer(), startEmailWorker()]);
 
   const shutdown = async (signal: string) => {
     if (shuttingDown) {
@@ -14,15 +15,9 @@ const start = async () => {
     }
 
     shuttingDown = true;
-    console.log(`Received ${signal}. Shutting down API server...`);
+    console.log(`Received ${signal}. Shutting down API and worker...`);
 
-    try {
-      await apiServer.close();
-    } catch (error) {
-      console.error("Error while closing HTTP server.", error);
-      process.exitCode = 1;
-    }
-
+    await Promise.allSettled([apiServer.close(), workerHandle.close()]);
     await Promise.allSettled([
       closeQueueResources(),
       closeRedisConnections(),
@@ -40,7 +35,7 @@ const start = async () => {
 };
 
 void start().catch(async (error) => {
-  console.error("API server failed to start cleanly.", error);
+  console.error("Combined API/worker service failed to start cleanly.", error);
   await Promise.allSettled([
     closeQueueResources(),
     closeRedisConnections(),

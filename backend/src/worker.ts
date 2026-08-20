@@ -1,72 +1,44 @@
-import { Worker } from "bullmq";
-import { env } from "./config.js";
 import { disconnectPrisma } from "./prisma.js";
-import {
-  closeQueueResources,
-  emailQueueEvents,
-  EmailJobPayload
-} from "./queue.js";
-import { closeRedisConnections, redisForBullMqWorker } from "./redis.js";
-import { createEmailJobProcessor } from "./services/email-worker.service.js";
-import {
-  reconcileEmailQueueState,
-  recoverStalledEmailJob
-} from "./services/restart-recovery.service.js";
+import { closeQueueResources } from "./queue.js";
+import { closeRedisConnections } from "./redis.js";
+import { startEmailWorker } from "./worker-runner.js";
 
-const processEmailJob = createEmailJobProcessor();
+let shuttingDown = false;
 
-const worker = new Worker<EmailJobPayload>(env.EMAIL_QUEUE_NAME, processEmailJob, {
-  connection: redisForBullMqWorker,
-  concurrency: env.WORKER_CONCURRENCY,
-  autorun: false
-});
+const start = async () => {
+  const workerHandle = await startEmailWorker();
 
-emailQueueEvents.on("completed", ({ jobId }) => {
-  console.log(`Email job completed: ${jobId}`);
-});
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) {
+      return;
+    }
 
-emailQueueEvents.on("failed", ({ jobId, failedReason }) => {
-  console.error(`Email job failed: ${jobId}`, failedReason);
-});
+    shuttingDown = true;
+    console.log(`Received ${signal}. Shutting down worker...`);
 
-emailQueueEvents.on("stalled", ({ jobId }) => {
-  console.warn(`Email job stalled: ${jobId}`);
+    await Promise.allSettled([
+      workerHandle.close(),
+      closeQueueResources(),
+      closeRedisConnections(),
+      disconnectPrisma()
+    ]);
 
-  if (!jobId) {
-    return;
+    process.exit();
+  };
+
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      void shutdown(signal);
+    });
   }
+};
 
-  void recoverStalledEmailJob(jobId).catch((error) => {
-    console.error(`Failed to recover stalled job ${jobId}.`, error);
-  });
-});
-
-const shutdown = async (signal: string) => {
-  console.log(`Received ${signal}. Shutting down worker...`);
+void start().catch(async (error) => {
+  console.error("Worker failed to start cleanly.", error);
   await Promise.allSettled([
-    worker.close(),
     closeQueueResources(),
     closeRedisConnections(),
     disconnectPrisma()
   ]);
-  process.exit();
-};
-
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    void shutdown(signal);
-  });
-}
-
-const startWorker = async () => {
-  await reconcileEmailQueueState();
-  void worker.run().catch((error) => {
-    console.error("Worker run loop terminated unexpectedly.", error);
-  });
-  console.log(`Worker started with concurrency ${env.WORKER_CONCURRENCY}`);
-};
-
-void startWorker().catch(async (error) => {
-  console.error("Worker failed to start cleanly.", error);
-  await shutdown("startup failure");
+  process.exit(1);
 });

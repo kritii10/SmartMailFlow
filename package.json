@@ -12,6 +12,8 @@
     "worker": "npm run worker:dev --workspace backend",
     "start:backend": "npm run start --workspace backend",
     "start:worker": "npm run worker --workspace backend",
+    "start:all": "npm run start:all --workspace backend",
+    "start:production": "npm run start:production --workspace backend",
     "load:test": "npm run load:test --workspace backend",
     "dev:frontend": "npm run dev --workspace frontend",
     "lint": "npm run lint --workspaces",
