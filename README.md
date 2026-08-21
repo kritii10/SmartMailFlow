@@ -14,10 +14,29 @@ Tech stack:
 .
 ├── backend
 ├── frontend
+├── docs/screenshots
 ├── docker-compose.yml
 ├── .env.example
 └── README.md
 ```
+
+## Screenshots
+
+### Login
+
+![Login page](docs/screenshots/login-page.png)
+
+### Dashboard
+
+![Dashboard page](docs/screenshots/dashboard-page.png)
+
+### Compose New Email
+
+![Compose email modal](docs/screenshots/compose-modal.png)
+
+### Sent Emails
+
+![Sent emails page](docs/screenshots/sent-emails-page.png)
 
 ## Environment setup
 
