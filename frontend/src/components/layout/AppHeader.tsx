@@ -1,16 +1,19 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import { getInitials } from "../../utils/format";
 import { Button } from "../ui/Button";
 
 export const AppHeader = () => {
   const { logout, user } = useAuth();
+  const [showAvatarImage, setShowAvatarImage] = useState(Boolean(user?.avatar));
+
+  useEffect(() => {
+    setShowAvatarImage(Boolean(user?.avatar));
+  }, [user?.avatar]);
 
   if (!user) {
     return null;
   }
-
-  const initials = getInitials(user.name, user.email);
 
   return (
     <header className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-sm md:px-6">
@@ -42,15 +45,38 @@ export const AppHeader = () => {
           </nav>
 
           <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-xs font-semibold uppercase text-slate-700">
-              {user.avatar ? (
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[radial-gradient(circle_at_top,_#34d399,_#0f172a_72%)] text-xs font-semibold uppercase text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]">
+              {user.avatar && showAvatarImage ? (
                 <img
                   alt={user.name ?? user.email}
                   className="h-full w-full rounded-full object-cover"
+                  onError={() => {
+                    setShowAvatarImage(false);
+                  }}
                   src={user.avatar}
                 />
               ) : (
-                initials
+                <svg
+                  aria-hidden="true"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M6.5 7.25h6.25a3.25 3.25 0 0 1 0 6.5H9.75v3.5H6.5v-10Z"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                  <path
+                    d="M14.75 9.25h2.75a2 2 0 0 1 0 4H15"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                  />
+                </svg>
               )}
             </div>
             <div>
